@@ -15,7 +15,8 @@ pip install .
 ```
 
 ## Getting Started
-Include the configuration files in your current project directory, following the project structure below. Then, use the `test.py` and its command line parameters to 
+Include the configuration files in your current project directory, following the project structure below.
+Then, use the `test.py` and its command line parameters to launch experiments.
 
 0. `export EXPS_HOSTNAME=<customhostname>`
 1. Project structure:
