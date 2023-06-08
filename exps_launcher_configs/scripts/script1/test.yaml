@@ -1,0 +1,7 @@
+---
+wandb: disabled
+timesteps: 1000
+eval_freq: 500
+eval_episodes: 1
+test_episodes: 1
+seed: 42
