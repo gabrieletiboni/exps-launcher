@@ -16,7 +16,7 @@ pip install .
 
 ## Getting Started
 Include the configuration files in your current project directory, following the project structure below.
-Then, use the `test.py` and its command line parameters to launch experiments.
+Then, use the `launch_exps.py` and its command line parameters to launch experiments.
 
 0. `export EXPS_HOSTNAME=<customhostname>`
 1. Project structure:
@@ -39,8 +39,8 @@ Then, use the `test.py` and its command line parameters to launch experiments.
     └── sweeps/                  # sweep configurations
         └── fiveseeds.yaml
 ```
-2. Launch `test.py` script:
-	- `test.py script=script1 config[conf1,conf2] sweep.config=[fiveseeds] sweep.foo=[1,10,100]`
+2. Launch `launch_exps.py` script:
+	- `launch_exps.py script=script1 config[conf1,conf2] sweep.config=[fiveseeds] sweep.foo=[1,10,100]`
 
 Notes:
 - subdirs of `scripts/` must be named with the corresponding python script name. E.g. the project structure above will call `python script1.py` and `python script2.py` respectively.
