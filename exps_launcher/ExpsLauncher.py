@@ -118,15 +118,15 @@ class ExpsLauncher():
         host_configs = {'host': host_configs}
 
         # Get python script parameters
-        script_configs = self._read_script_configs(cli_args)
+        script_params = self._read_script_configs(cli_args)
         scriptname = str(cli_args.script)+'.py'
 
         # Merge script configs with host configs, prioritizing script configs
-        script_configs = OmegaConf.merge(host_configs, script_configs)
-        self._check_unexpected_script_params(script_configs)
+        script_params = OmegaConf.merge(host_configs, script_params)
+        self._check_unexpected_script_params(script_params)
 
         # Get sweep parameters for launching multiple exps. E.g. sweep.seed=[42,43,44]
-        sweep_params = self._handle_sweep_params(cli_args, script_configs)
+        sweep_params = self._handle_sweep_params(cli_args, script_params)
 
         # Get test parameters for test run
         if exps_params.test:
@@ -134,7 +134,7 @@ class ExpsLauncher():
         else:
             test_params = None
 
-        # Merge script parameters in cli_args with script_configs, prioritizing cli_args
+        # Merge script parameters in cli_args with script_params, prioritizing cli_args
         del cli_args.script
         if 'config' in cli_args:
             del cli_args.config
@@ -142,12 +142,14 @@ class ExpsLauncher():
             del cli_args.exps
         if 'sweep' in cli_args:
             del cli_args.sweep
-        configs = OmegaConf.merge(script_configs, cli_args)
+        if 'sweep' in script_params:
+            del script_params.sweep
+
+        configs = OmegaConf.merge(script_params, cli_args)
         
         # Isolate script parameters only
         script_params = deepcopy(configs)
         del script_params.host
-        del script_params.name
 
         # Isolate host parameters only
         host_params = self.args_parser.to_dict(configs.host)
@@ -180,27 +182,34 @@ class ExpsLauncher():
         test_params = OmegaConf.load(test_params_filename)
         return test_params
 
-    def _handle_sweep_params(self, cli_args):
+    def _handle_sweep_params(self, cli_args, script_params):
         """Get all sweep parameters"""
+        sweeps = {}
+        sweeps_from_config = {}
         if 'sweep' in cli_args:
-            sweeps = {}
-            sweeps_from_config = {}
             for param in cli_args.sweep:
-
-                if param == 'config': # load sweep config files
+                # Load sweep config files
+                if param == 'config':
                     sweep_conf_files = self.args_parser.as_list(cli_args.sweep[param])
                     for sweep_conf_file in sweep_conf_files:
-                        assert os.path.isfile(os.path.join(scripts_root, self.args_parser.add_extension(conf))), f'Desired' \
-                                f'.yaml file does not exist: {os.path.join(scripts_root, self.args_parser.add_extension(conf))}'
-                        current =  OmegaConf.load(os.path.join(scripts_root, self.args_parser.add_extension(conf)))
+                        assert os.path.isfile(os.path.join(self.root, self.sweep_config_root, self.args_parser.add_extension(sweep_conf_file))),\
+                                f'Desired .yaml file does not exist: '\
+                                f'{os.path.join(self.root, self.sweep_config_root, self.args_parser.add_extension(sweep_conf_file))}'
+                        current =  OmegaConf.load(os.path.join(self.root, self.sweep_config_root, self.args_parser.add_extension(sweep_conf_file)))
                         OmegaConf.merge(sweeps_from_config, current)
+                else:
+                    sweeps[param] = self.args_parser.as_list(cli_args.sweep[param])
+            
+            # Merge sweeps, prioritizing sweeps in command line
+            sweeps = OmegaConf.merge(sweeps_from_config, sweeps)
 
-                sweeps[param] = self.args_parser.as_list(cli_args.sweep[param])
-            # sweeps
+        sweep_from_script = {}
+        if 'sweep' in script_params:
+            sweep_from_script = deepcopy(script_params.sweep)
 
+        sweeps = OmegaConf.merge(sweep_from_script, sweeps)
 
-        # else:
-        #     return {}
+        return sweeps
 
     def _run_test(test_params, script_params):
         pass
@@ -262,14 +271,11 @@ class ExpsLauncher():
                 assert os.path.isfile(os.path.join(scripts_root, self.args_parser.add_extension(conf))), f'Desired' \
                         f'.yaml file does not exist: {os.path.join(scripts_root, self.args_parser.add_extension(conf))}'
                 current =  OmegaConf.load(os.path.join(scripts_root, self.args_parser.add_extension(conf)))
-                OmegaConf.merge(script_configs, current)
+                script_configs = OmegaConf.merge(script_configs, current)
 
         # Overwrite default values with specific 2nd-level category values
         script_configs = OmegaConf.merge(default_script_configs, script_configs)
 
-        # Make sure special parameter `name` is defined. It indicates the python script name to run
-        # assert 'name' in script_configs and isinstance(script_configs.name, str), f'`name` parameter must be passed,' \
-        #                                             'corresponding to the script name to be run for this configuration'
         return script_configs
 
     def _read_host_configs(self, hostname):
