@@ -24,14 +24,14 @@ Then, use the `launch_exps.py` and its command line parameters to launch experim
 .
 └── exps_root/
     ├── default.yaml             # exp-launcher defaults
-    ├── host/
+    ├── host/					 # host-specific sbatch parameters (--partition, --project, ...)
     │   ├── host1.yaml
     │   ├── host2.yaml
     │   └── ...
     ├── scripts/
-    │   ├── script1/			 # call python script1.py
-    │   │   ├── default.yaml     # default configs for "script1 exps"
-    │   │   ├── test.yaml        # configs for test run
+    │   ├── script1/			 # `python script1.py ...`
+    │   │   ├── default.yaml     # default params for `script1.py`
+    │   │   ├── test.yaml        # params for testing with `script.py`
     │   │   ├── conf1.yaml
     │   │   └── conf2.yaml
     │   └── script2/
@@ -47,6 +47,7 @@ Notes:
 - the `script` parameter is mandatory, and must be a single string. A single script can be invoked.
 - multiple configurations for the same script can be provided with the `config` parameter. Priority is in decreasing order, i.e. conf2 overwrites conf1 in the example above.
 - sweep parameters like `sweep.foo=[1,10,100]` can also be defined in script-specific conf files.
+- host parameters like `host.time="03:00:00"` can also be defined in script-specific conf files, which overwrite the host definitions. This way you can specify different sbatch times for different scripts and their corresponding configurations.
 
 
 ## Troubleshooting
