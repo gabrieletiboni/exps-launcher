@@ -67,3 +67,12 @@ class OmegaConfParser():
 
     def get_random_string(self, n=5):
         return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(n))
+
+    @staticmethod
+    def is_list(val):
+        if isinstance(val, list):
+            return True
+        elif hasattr(val, '_content') and isinstance(val._content, list):
+            return True
+        else:
+            return False

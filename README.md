@@ -23,9 +23,10 @@ Then, use the `launch_exps.py` and its command line parameters to launch experim
 ```
 .
 └── exps_root/
-    ├── default.yaml             # exp-launcher defaults
+    ├── config.yaml              # exps_launcher configs (can be overwritten by command exps.<params>)
     ├── host/					 # host-specific sbatch parameters (--partition, --project, ...)
-    │   ├── host1.yaml
+    │   ├── default.yaml         # default params for all hosts
+    │   ├── host2.yaml
     │   ├── host2.yaml
     │   └── ...
     ├── scripts/
@@ -40,14 +41,20 @@ Then, use the `launch_exps.py` and its command line parameters to launch experim
         └── fiveseeds.yaml
 ```
 2. Launch `launch_exps.py` script:
-	- `launch_exps.py script=script1 config[conf1,conf2] sweep.config=[fiveseeds] sweep.foo=[1,10,100]`
+	- `launch_exps.py script=script1 config=[conf1,conf2] sweep.config=[fiveseeds] sweep.foo=[1,10,100]`
 
 Notes:
 - subdirs of `scripts/` must be named with the corresponding python script name. E.g. the project structure above will call `python script1.py` and `python script2.py` respectively.
 - the `script` parameter is mandatory, and must be a single string. A single script can be invoked.
 - multiple configurations for the same script can be provided with the `config` parameter. Priority is in decreasing order, i.e. conf2 overwrites conf1 in the example above.
 - sweep parameters like `sweep.foo=[1,10,100]` can also be defined in script-specific conf files.
-- host parameters like `host.time="03:00:00"` can also be defined in script-specific conf files, which overwrite the host definitions. This way you can specify different sbatch times for different scripts and their corresponding configurations.
+- host parameters like `host.time="03:00:00"` can also be defined in script-specific conf files, which overwrite the host definitions. This way you can specify different sbatch times for different scripts and their corresponding configurations, or different sbatch names.
+
+Advanced commands:
+- Use exps.<param> for extra options on this function. Accepted params are:
+  - exps.test
+  - exps.no_confirmation
+  - exps.fake
 
 
 ## Troubleshooting
