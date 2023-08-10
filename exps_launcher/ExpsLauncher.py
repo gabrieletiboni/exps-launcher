@@ -301,16 +301,19 @@ class ExpsLauncher():
         sweeps = OmegaConf.merge(sweep_from_script, sweeps)
 
         # Overwrite parameters defined both in the sweep and in the script/cli_args
-        remove_keys = []
+        overwritten_values = {}
+        values_overwitten_with = {}
         for k, v in sweeps.items():
             if k in cli_args:
-                remove_keys.append(k)
+                overwritten_values[k] = cli_args[k]
+                values_overwitten_with[k] = v
                 delattr(cli_args, k)
             elif k in script_params:
-                remove_keys.append(k)
+                overwritten_values[k] = script_params[k]
+                values_overwitten_with[k] = v
                 delattr(script_params, k)
-        if len(remove_keys) != 0:
-            print(f'--- WARNING! Parameters {remove_keys} defined explicitly have been overwritten by the sweep.<name> counterpart values')
+        if len(overwritten_values) != 0:
+            print(f'--- WARNING! Parameters {overwritten_values} defined explicitly have been overwritten by the sweep.<name> counterpart values {values_overwitten_with}')
 
         return sweeps, cli_args, script_params
 
@@ -438,6 +441,6 @@ class ExpsLauncher():
                 raise ValueError(f'{self.hostname_env_variable} environment variable is not set. Cannot recognize ' \
                                  f'current hostname. (Set config exps.force_hostname_environ=False to automatically detect it as: "{socket.gethostname().lower()}")')
             else:
-                print(f'--- WARNING! {self.hostname_env_variable} env variable is not defined, so automatic hostname ' \
+                print(f'--- WARNING! {self.hostname_env_variable} env variable is not defined, so automatic hostname "{socket.gethostname().lower()}" ' \
                       'is retrieved instead.')
                 return socket.gethostname().lower()
