@@ -129,7 +129,7 @@ class ExpsLauncher():
         self._check_unexpected_script_params(script_params)
 
         # Get sweep parameters for launching multiple exps. E.g. sweep.seed=[42,43,44]
-        sweep_params = self._handle_sweep_params(cli_args, script_params)
+        sweep_params, cli_args, script_params = self._handle_sweep_params(cli_args, script_params)
 
         # Get test parameters for test run
         test_params = self._get_test_params(cli_args) if exps_params.test else None
@@ -259,7 +259,7 @@ class ExpsLauncher():
         """Make sure a wandb group has been defined if wandb online mode is active"""
         if 'wandb' in script_params and script_params['wandb'] == 'online':
             if 'group' not in script_params:
-                print('WARNING! A wandb group has not been defined and wandb is running in online mode. ')
+                print('--- WARNING! A wandb group has not been defined and wandb is running in online mode. ')
                 if not self.ask_confirmation('Do you wish to continue without specifying a group name? (y/n)'):
                     sys.exit()
 
@@ -300,7 +300,19 @@ class ExpsLauncher():
 
         sweeps = OmegaConf.merge(sweep_from_script, sweeps)
 
-        return sweeps
+        # Overwrite parameters defined both in the sweep and in the script/cli_args
+        remove_keys = []
+        for k, v in sweeps.items():
+            if k in cli_args:
+                remove_keys.append(k)
+                delattr(cli_args, k)
+            elif k in script_params:
+                remove_keys.append(k)
+                delattr(script_params, k)
+        if len(remove_keys) != 0:
+            print(f'--- WARNING! Parameters {remove_keys} defined explicitly have been overwritten by the sweep.<name> counterpart values')
+
+        return sweeps, cli_args, script_params
 
 
     def _display_summary(self, scriptname, script_params, host_params, sweep_params={}, test_params=None, preview_jobs=False):
