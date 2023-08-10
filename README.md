@@ -1,10 +1,10 @@
 # Slurm experiments launcher for python scripts
 Handle batch job submission on multiple clusters with ease.
 
-This project is a work in progress:
-- [ ] SLURM batch job submission
-  - [ ] test run
-- [ ] parallel python script submissions without slurm, on a local workstation
+### Features tracking
+
+- [X] Slurm jobs submission
+- [ ] non-slurm scripts submission
 
 ## Installation
 ```
@@ -60,7 +60,9 @@ Advanced commands:
   - exps.force_hostname_environ
 
 
+
 ## Troubleshooting
+
 
 
 
