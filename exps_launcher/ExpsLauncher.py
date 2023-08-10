@@ -167,6 +167,8 @@ class ExpsLauncher():
             if not self.ask_confirmation('Do you wish to launch these experiments? (y/n)'):
                 return False
 
+        pdb.set_trace()
+
         self._launch_jobs(
                           host_params=host_params,
                           script_params=script_params if test_params is None else test_params,
@@ -189,7 +191,7 @@ class ExpsLauncher():
                 return
             command = ''
 
-            if with_slurm:
+            if with_slurm and len(host_params) != 0:
                 command += 'srun '
                 command += self._format_host_params(host_params, default_name=default_name)
             command += f'python {default_name}.py '
