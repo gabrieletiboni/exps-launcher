@@ -4,6 +4,7 @@ import os
 import socket
 from copy import deepcopy
 import subprocess
+import sys
 
 from sklearn.model_selection import ParameterGrid
 try:
@@ -18,20 +19,16 @@ class ExpsLauncher():
     
     def __init__(self,
                  root : str,
-                 force_hostname_environ: bool = True,
                  infer_cpus_per_task: bool = True):
         """
             
             root : path to configuration files
-            force_hostname_environ : force environment variable to be set
-                                     to recognize current hostname
             infer_cpus_per_task : set cpus-per-task as the --now parameter.
                                   you can overwrite this behavior by passing a custom parameter
                                   from command line
         """
         self.root = os.path.join(root)
         assert os.path.isdir(self.root), f'Given root folder does not exist on current system: {self.root}'
-        self.force_hostname_environ = force_hostname_environ
         self.infer_cpus_per_task = infer_cpus_per_task
 
         ### Fixed parameters ######################
@@ -84,24 +81,28 @@ class ExpsLauncher():
 
         exps_params = OmegaConf.merge(default_exps_params, exps_params)
 
-        # Hard code default params if they are not in the config.yaml file
-        defaults = {'test': False, 'no_confirmation': False, 'fake': False, 'preview': False}
+        # Hard code default boolean params if they are not in the config.yaml file
+        defaults = {'test': False, 'no_confirmation': False, 'fake': False, 'preview': False, 'force_hostname_environ': True}
         for k, v in defaults.items():
             if k not in exps_params:
                 exps_params[k] = v
+            else:
+                assert exps_params[k] is not None, f'parameter exps.{k} should be a boolean, not None.'
 
         return exps_params
 
     def launch(self):
         """
-            Use exps.<param> for extra options on this function.
+            Use cliargs of type exps.<param> for extra options on this function.
             Accepted params are:
 
-            test : bool, if set, launch the desired script with test parameters to check that
+            exps.test : bool, if set, launch the desired script with test parameters to check that
                                  input parameters are correct. Only first sweep configuration is checked.
-            no_confirmation : bool, do not ask for confirmation and do not display summary
-            fake : bool, prints out the slurm job submission commands instead of running them
-            preview : bool, prints out all slurm instructions that would be run
+            exps.no_confirmation : bool, do not ask for confirmation and do not display summary
+            exps.fake : bool, prints out the slurm job submission commands instead of running them
+            exps.preview : bool, prints out all slurm instructions that would be run
+            exps.force_hostname_environ : force environment variable to be set
+                                          to recognize current hostname
         """
         # Read input parameters
         cli_args = self.args_parser.parse_from_cli()
@@ -110,11 +111,10 @@ class ExpsLauncher():
         if 'exps' in cli_args:
             del cli_args.exps
 
-        print('TODO: you can pass exps.hostname to overwrite the hostname. E.g. to have different host configurations for the same host.')
         assert self._check_mandatory_params(cli_args), f'Not all mandatory parameters have been set.'
 
         # Retrieve current machine's hostname from Environ Variable
-        hostname = self._get_hostname()
+        hostname = self._get_hostname(exps_params=exps_params)
         
         # Read host configs for SBATCH parameters
         host_configs = self._read_host_configs(hostname)
@@ -150,6 +150,7 @@ class ExpsLauncher():
         # Isolate script parameters only
         script_params = deepcopy(configs)
         del script_params.host
+        self.wandb_sanity_check(script_params)
 
         # Isolate host parameters only
         host_params = self.args_parser.to_dict(configs.host)
@@ -202,14 +203,26 @@ class ExpsLauncher():
         if fake:
             print(command)
         else:
-            retcode = subprocess.call("./launch_exps")
-            print('Return code of test.py is:', retcode)
+            retcode = subprocess.call(command)
+            # print('Return code of command is:', retcode)
 
 
-    def _format_sweep_config(self, sweet_config):
+    def _format_host_params(self, host_params, default_name):
+        """Returns formatted string for job parameters
+        when launching slurm command inline"""
         string = ''
-        for k, v in sweet_config.items():
-            string += f'--{k}={v} '
+        for k, v in host_params.items():
+            assert not self.args_parser.is_list(v), 'Host parameters are not expected to be lists. These should be strings.'
+            if v != '' and v is not None:
+                string += f'--{k}="{v}" '
+
+        if 'job-name' not in host_params:
+            string += f'--job-name="{default_name}" '
+
+        # Hard-code ntasks to 1, if not present
+        if 'ntasks' not in host_params:
+            string += f'--ntasks=1 '
+
         return string
 
 
@@ -223,32 +236,29 @@ class ExpsLauncher():
                 for single_v in v:
                     string += f'{single_v} '
             else:
-                string += f'--{k}={v} '
+                string += f'--{k}="{v}" '
         return string
 
 
-    def _format_host_params(self, host_params, default_name):
-        """Returns formatted string for job parameters
-        when launching slurm command inline"""
+    def _format_sweep_config(self, sweet_config):
         string = ''
-        for k, v in host_params.items():
-            assert not self.args_parser.is_list(v), 'Host parameters are not expected to be lists. These should be strings.'
-            if v != '' and v is not None:
-                string += f'--{k}={v} '
-
-        if 'job-name' not in host_params:
-            string += f'--job-name={default_name} '
-
-        # Hard-code ntasks to 1, if not present
-        if 'ntasks' not in host_params:
-            string += f'--ntasks=1 '
-
+        for k, v in sweet_config.items():
+            string += f'--{k}={v} '
         return string
 
 
     def _check_unexpected_script_params(self, script_configs):
         if 'exps' in script_configs:
             raise ValueError(f'`exps` param should not be controlled in the script parameters. `exps` key is reserved for exps_launcher parameters.')
+
+
+    def wandb_sanity_check(self, script_params):
+        """Make sure a wandb group has been defined if wandb online mode is active"""
+        if 'wandb' in script_params and script_params['wandb'] == 'online':
+            if 'group' not in script_params:
+                print('WARNING! A wandb group has not been defined and wandb is running in online mode. ')
+                if not self.ask_confirmation('Do you wish to continue without specifying a group name? (y/n)'):
+                    sys.exit()
 
 
     def _get_test_params(self, cli_args):
@@ -399,16 +409,19 @@ class ExpsLauncher():
         return True
 
 
-    def _get_hostname(self):
+    def _get_hostname(self, exps_params):
         """Get current machine hostname
             Prioritise the use of the env variable
         """
+        if 'hostname' in exps_params and exps_params.hostname is not None and exps_params.hostname != '':
+            return exps_params.hostname
+
         if os.environ.get(self.hostname_env_variable) is not None:
             return os.environ.get(self.hostname_env_variable).lower()
         else:
-            if self.force_hostname_environ:
+            if exps_params.force_hostname_environ:
                 raise ValueError(f'{self.hostname_env_variable} environment variable is not set. Cannot recognize ' \
-                                 f'current hostname. (Set force_hostname_environ=False to automatically detect it as: "{socket.gethostname().lower()}")')
+                                 f'current hostname. (Set config exps.force_hostname_environ=False to automatically detect it as: "{socket.gethostname().lower()}")')
             else:
                 print(f'--- WARNING! {self.hostname_env_variable} env variable is not defined, so automatic hostname ' \
                       'is retrieved instead.')

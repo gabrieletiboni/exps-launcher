@@ -49,12 +49,15 @@ Notes:
 - multiple configurations for the same script can be provided with the `config` parameter. Priority is in decreasing order, i.e. conf2 overwrites conf1 in the example above.
 - sweep parameters like `sweep.foo=[1,10,100]` can also be defined in script-specific conf files.
 - host parameters like `host.time="03:00:00"` can also be defined in script-specific conf files, which overwrite the host definitions. This way you can specify different sbatch times for different scripts and their corresponding configurations, or different sbatch names.
+- you can pass `exps.hostname` to overwrite the hostname for the current experiment, e.g. to have different host configurations for the same host
 
 Advanced commands:
-- Use exps.<param> for extra options on this function. Accepted params are:
+- Use exps.<param_name>=<value> for config options. Accepted params are:
   - exps.test
   - exps.no_confirmation
   - exps.fake
+  - exps.hostname
+  - exps.force_hostname_environ
 
 
 ## Troubleshooting
