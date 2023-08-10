@@ -167,8 +167,6 @@ class ExpsLauncher():
             if not self.ask_confirmation('Do you wish to launch these experiments? (y/n)'):
                 return False
 
-        pdb.set_trace()
-
         self._launch_jobs(
                           host_params=host_params,
                           script_params=script_params if test_params is None else test_params,
@@ -224,6 +222,9 @@ class ExpsLauncher():
         # Hard-code ntasks to 1, if not present
         if 'ntasks' not in host_params:
             string += f'--ntasks=1 '
+
+        if len(host_params) != 0:
+            assert 'time' in host_params, 'You are required to specify a time parameter for your slurm jobs.'
 
         return string
 
