@@ -16,7 +16,7 @@ pip install .
 
 ## Getting Started
 Include the configuration files in your current project directory, following the project structure below.
-Then, use the `launch_exps.py` and its command line parameters to launch experiments.
+Then, copy and launch the `launch_exps.py` with its command line parameters to launch experiments.
 
 0. `export EXPS_HOSTNAME=<customhostname>`
 1. Project structure:

@@ -1,4 +1,3 @@
 #!/bin/bash
 
-
-echo "test script"
+python launch_exps.py "$@"
