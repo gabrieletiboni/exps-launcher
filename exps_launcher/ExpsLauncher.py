@@ -311,7 +311,7 @@ class ExpsLauncher():
                                 f'Desired .yaml file does not exist: '\
                                 f'{os.path.join(self.root, self.sweep_configs_root, self.args_parser.add_extension(sweep_conf_file))}'
                         current =  OmegaConf.load(os.path.join(self.root, self.sweep_configs_root, self.args_parser.add_extension(sweep_conf_file)))
-                        OmegaConf.merge(sweeps_from_config, current)
+                        sweeps_from_config = OmegaConf.merge(sweeps_from_config, current)
                 else:
                     sweeps[param] = self.args_parser.as_list(cli_args.sweep[param])
             
