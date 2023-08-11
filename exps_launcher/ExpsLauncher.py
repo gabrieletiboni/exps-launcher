@@ -210,7 +210,7 @@ class ExpsLauncher():
         if fake:
             print(command)
         else:
-            subprocess.run(command)
+            subprocess.run(command, shell=True)
 
 
     def _format_host_params(self, host_params, default_name):
