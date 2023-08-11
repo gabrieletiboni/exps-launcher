@@ -158,7 +158,7 @@ class ExpsLauncher():
         # Isolate host parameters only
         host_params = self.args_parser.to_dict(configs.host)
 
-        wandb_group_name = self.handle_wandb_group_name(script_params, script_config_names)
+        wandb_group_name = self.handle_wandb_group_name(script_params, script_config_names, exps_params)
         if wandb_group_name is not None:
             script_params.group = wandb_group_name
 
@@ -265,15 +265,18 @@ class ExpsLauncher():
             raise ValueError(f'`exps` param should not be controlled in the script parameters. `exps` key is reserved for exps_launcher parameters.')
 
 
-    def handle_wandb_group_name(self, script_params, script_config_names):
+    def handle_wandb_group_name(self, script_params, script_config_names, exps_params):
         """Make sure a wandb group has been defined if wandb online mode is active"""
         if 'wandb' in script_params and script_params['wandb'] == 'online':
             if 'group' not in script_params:
+                group_name = self.get_default_wandb_group(script_config_names)
+                if 'group_suffix' in exps_params:
+                    group_name += exps_params.group_suffix
+
                 print(f'--- WARNING! A wandb group has not been defined and wandb is running in online mode. ' \
-                      f'Default group name will be: {self.get_default_wandb_group(script_config_names)}')
-                # if not self.ask_confirmation('Do you wish to continue without specifying a group name? (y/n)'):
-                #     sys.exit()
-                return self.get_default_wandb_group(script_config_names)
+                      f'Default group name will be: {group_name}')
+                
+                return group_name
         else:
             return None
 

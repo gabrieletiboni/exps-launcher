@@ -4,6 +4,9 @@ Handle batch job submission on multiple clusters with ease.
 ### Features tracking
 
 - [X] Slurm jobs submission
+    - [ ] common config files for different scripts
+    - [ ] additive host.time for config files
+    - [X] wandb_group_suffix for default wandb name
 - [ ] non-slurm scripts submission
 
 ## Installation
@@ -24,13 +27,13 @@ Then, copy and launch the `launch_exps.py` with its command line parameters to l
 .
 └── exps_root/
     ├── config.yaml              # exps_launcher configs (can be overwritten by command exps.<params>)
-    ├── host/					 # host-specific sbatch parameters (--partition, --project, ...)
+    ├── host/                    # host-specific sbatch parameters (--partition, --project, ...)
     │   ├── default.yaml         # default params for all hosts
     │   ├── host2.yaml
     │   ├── host2.yaml
     │   └── ...
     ├── scripts/
-    │   ├── script1/			 # `python script1.py ...`
+    │   ├── script1/             # `python script1.py ...`
     │   │   ├── default.yaml     # default params for `script1.py`
     │   │   ├── test.yaml        # params for testing with `script.py`
     │   │   ├── conf1.yaml
@@ -41,7 +44,7 @@ Then, copy and launch the `launch_exps.py` with its command line parameters to l
         └── fiveseeds.yaml
 ```
 2. Launch `launch_exps.py` script:
-	- `launch_exps.py script=script1 config=[conf1,conf2] sweep.config=[fiveseeds] sweep.foo=[1,10,100]`
+    - `launch_exps.py script=script1 config=[conf1,conf2] sweep.config=[fiveseeds] sweep.foo=[1,10,100]`
 
 Notes:
 - subdirs of `scripts/` must be named with the corresponding python script name. E.g. the project structure above will call `python script1.py` and `python script2.py` respectively.
@@ -58,6 +61,7 @@ Advanced commands:
   - exps.fake
   - exps.hostname
   - exps.force_hostname_environ
+  - exps.group_suffix
 
 
 
