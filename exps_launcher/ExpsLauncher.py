@@ -196,12 +196,12 @@ class ExpsLauncher():
             command = ''
 
             if with_slurm and len(host_params) != 0:
-                command += f'srun -o run_{i}.out -e run_{i}.out '
+                command += f'sbatch '
                 command += self._format_host_params(host_params, default_name=default_name)
-            command += f'python {default_name}.py '
+            command += f'--wrap \'python {default_name}.py '
             command += self._format_script_params(script_params)
             command += self._format_sweep_config(sweep_config)
-            command += ' &'  # in the background
+            command += '\''  # end of --wrap command
             self._execute(command, fake=fake)
 
 
