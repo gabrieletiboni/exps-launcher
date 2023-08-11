@@ -29,6 +29,9 @@ class ExpsLauncher():
         """
         self.root = os.path.join(root)
         assert os.path.isdir(self.root), f'Given root folder does not exist on current system: {self.root}'
+        self.run_logs = os.path.join(self.root, 'run_logs')
+        if not os.path.isdir(self.run_logs):
+            self.create_dirs(self.run_logs)
         self.infer_cpus_per_task = infer_cpus_per_task
 
         ### Fixed parameters ######################
@@ -193,11 +196,12 @@ class ExpsLauncher():
             command = ''
 
             if with_slurm and len(host_params) != 0:
-                command += 'srun '
+                command += f'srun -o run_{i}.out -e run_{i}.out '
                 command += self._format_host_params(host_params, default_name=default_name)
             command += f'python {default_name}.py '
             command += self._format_script_params(script_params)
             command += self._format_sweep_config(sweep_config)
+            command += ' &'  # in the background
             self._execute(command, fake=fake)
 
 
@@ -466,3 +470,10 @@ class ExpsLauncher():
                 print(f'--- WARNING! {self.hostname_env_variable} env variable is not defined, so automatic hostname "{socket.gethostname().lower()}" ' \
                       'is retrieved instead.')
                 return socket.gethostname().lower()
+
+
+    def create_dirs(self, path):
+        try:
+            os.makedirs(os.path.join(path))
+        except OSError as error:
+            pass
