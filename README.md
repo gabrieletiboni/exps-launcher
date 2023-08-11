@@ -7,7 +7,8 @@ Handle batch job submission on multiple clusters with ease.
     - [ ] common config files for different scripts
     - [ ] additive host.time for config files
     - [X] wandb_group_suffix for default wandb name
-- [ ] non-slurm scripts submission
+    - [X] test run on local machine with exps.test=true
+- [ ] non-slurm background scripts submission
 
 ## Installation
 ```
@@ -26,7 +27,7 @@ Then, copy and launch the `launch_exps.py` with its command line parameters to l
 ```
 .
 └── exps_root/
-    ├── config.yaml              # exps_launcher configs (can be overwritten by command exps.<params>)
+    ├── config.yaml              # exps_launcher configs (can be overwritten by cli args exps.<params>)
     ├── host/                    # host-specific sbatch parameters (--partition, --project, ...)
     │   ├── default.yaml         # default params for all hosts
     │   ├── host2.yaml

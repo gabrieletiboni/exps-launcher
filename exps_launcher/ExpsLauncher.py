@@ -135,8 +135,11 @@ class ExpsLauncher():
         # Get sweep parameters for launching multiple exps. E.g. sweep.seed=[42,43,44]
         sweep_params, cli_args, script_params = self._handle_sweep_params(cli_args, script_params)
 
-        # Get test parameters for test run
-        test_params = self._get_test_params(cli_args) if exps_params.test else None
+        # Get parameters for test run
+        if exps_params.test:
+            test_params = self._get_test_params(cli_args)
+            script_params = OmegaConf.merge(script_params, test_params)
+        
 
         # Merge script parameters in cli_args with script_params, prioritizing cli_args
         del cli_args.script
@@ -168,22 +171,22 @@ class ExpsLauncher():
                                   script_params=script_params,
                                   host_params=host_params,
                                   sweep_params=sweep_params,
-                                  test_params=test_params,
+                                  test=exps_params.test,
                                   preview_jobs=exps_params.preview)
 
-            if not self.ask_confirmation('Do you wish to launch these experiments? (y/n)'):
+            if not exps_params.test and not self.ask_confirmation('Do you wish to launch these experiments? (y/n)'):
                 return False
 
         self._launch_jobs(
                           host_params=host_params,
-                          script_params=script_params if test_params is None else test_params,
+                          script_params=script_params,
                           sweep_params=sweep_params,
                           default_name=scriptname,
                           fake=exps_params.fake,
 
-                          # One test run without slurm if exps.test=true
-                          with_slurm=True if test_params is None else False,
-                          max_runs=None if test_params is None else 1
+                          # Run one local test run without slurm if exps.test=true
+                          with_slurm=True if not exps_params.test else False,
+                          max_runs=None if not exps_params.test else 1
                         )
 
     def _launch_jobs(self, host_params, script_params, sweep_params, default_name, fake=False, max_runs=None, with_slurm=True):
@@ -191,18 +194,23 @@ class ExpsLauncher():
             
             fake: prints slurm instructions instead of running them
         """
+        with_slurm = True if with_slurm and len(host_params) != 0 else False
+
         for i, sweep_config in enumerate(ParameterGrid(dict(sweep_params))):
             if max_runs is not None and i >= max_runs:
                 return
             command = ''
 
-            if with_slurm and len(host_params) != 0:
+            if with_slurm:
                 command += f'sbatch '
                 command += self._format_host_params(host_params, default_name=default_name)
-            command += f'--wrap \'python {default_name}.py '
+                command += '--wrap \''  # wrap python command
+            command += f'python {default_name}.py '
             command += self._format_script_params(script_params)
             command += self._format_sweep_config(sweep_config)
-            command += '\''  # end of --wrap command
+            if with_slurm:
+                command += '\''  # end of --wrap command
+
             self._execute(command, fake=fake)
 
 
@@ -323,29 +331,36 @@ class ExpsLauncher():
 
         sweep_from_script = {}
         if 'sweep' in script_params:
-            sweep_from_script = deepcopy(script_params.sweep)
-
+            for param in script_params.sweep:
+                sweep_from_script[param] = self.args_parser.as_list(script_params.sweep[param])
         sweeps = OmegaConf.merge(sweep_from_script, sweeps)
 
-        # Overwrite parameters defined both in the sweep and in the script/cli_args
-        overwritten_values = {}
+        # Delete sweep parameters that have been explicitly defined in the cli_args
+        overwritten_sweep_values = {}
         values_overwitten_with = {}
         for k, v in sweeps.items():
             if k in cli_args:
-                overwritten_values[k] = cli_args[k]
-                values_overwitten_with[k] = v
-                delattr(cli_args, k)
-            elif k in script_params:
-                overwritten_values[k] = script_params[k]
+                overwritten_sweep_values[k] = v
+                values_overwitten_with[k] = cli_args[k]
+                delattr(sweeps, k)
+        if len(overwritten_sweep_values) != 0:
+            print(f'--- WARNING! Sweep parameters {overwritten_sweep_values} have been overwritten by single parameter values specified in the command line {values_overwitten_with}') 
+
+        # Overwrite parameters defined both in the sweep and as single script parameters (prioritizing sweep)
+        overwritten_script_params = {}
+        values_overwitten_with = {}
+        for k, v in sweeps.items():            
+            if k in script_params:
+                overwritten_script_params[k] = script_params[k]
                 values_overwitten_with[k] = v
                 delattr(script_params, k)
-        if len(overwritten_values) != 0:
-            print(f'--- WARNING! Parameters {overwritten_values} defined explicitly have been overwritten by the sweep.<name> counterpart values {values_overwitten_with}')
+        if len(overwritten_script_params) != 0:
+            print(f'--- WARNING! Parameters {overwritten_script_params} defined explicitly have been overwritten by the sweep.<name> counterpart values {values_overwitten_with}')
 
         return sweeps, cli_args, script_params
 
 
-    def _display_summary(self, scriptname, script_params, host_params, sweep_params={}, test_params=None, preview_jobs=False):
+    def _display_summary(self, scriptname, script_params, host_params, sweep_params={}, test=False, preview_jobs=False):
         print(f'{"="*40} SUMMARY {"="*40}')
         print(f'\nScript: {scriptname}.py')
         print('\nSBATCH parameters:', end='')
@@ -356,12 +371,6 @@ class ExpsLauncher():
 
         print('\nSWEEP parameters:', end='')
         print(self.args_parser.pformat_dict(sweep_params, indent=1))
-
-        print('\nTEST parameters:', end='')
-        if test_params is not None:
-            print(self.args_parser.pformat_dict(test_params, indent=1))
-        else:
-            print(' NO TEST RUN IS LAUNCHED.')
 
         n_exps = self._get_n_exps(sweep_params)
         print(f'\nA total number of {n_exps} jobs is requested.')
@@ -375,9 +384,9 @@ class ExpsLauncher():
                               default_name=scriptname,
                               fake=True,  # fake: simply print them
 
-                              # One test run without slurm if exps.test=true
-                              with_slurm=True if test_params is None else False,
-                              max_runs=None if test_params is None else 1
+                              # Run a local test run without slurm if exps.test=true
+                              with_slurm=True if not test else False,
+                              max_runs=None if not test else 1
                             )
         print(f'{"="*89}')
 
