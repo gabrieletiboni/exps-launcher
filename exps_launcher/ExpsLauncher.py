@@ -210,8 +210,7 @@ class ExpsLauncher():
         if fake:
             print(command)
         else:
-            retcode = subprocess.call(command)
-            # print('Return code of command is:', retcode)
+            subprocess.run(command)
 
 
     def _format_host_params(self, host_params, default_name):
