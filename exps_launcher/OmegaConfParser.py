@@ -76,3 +76,12 @@ class OmegaConfParser():
             return True
         else:
             return False
+
+    @staticmethod
+    def is_boolean(val):
+        if isinstance(val, bool):
+            return True
+        elif hasattr(val, '_content') and isinstance(val._content, bool):
+            return True
+        else:
+            return False

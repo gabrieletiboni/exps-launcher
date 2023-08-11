@@ -121,7 +121,7 @@ class ExpsLauncher():
         host_configs = {'host': host_configs}
 
         # Get python script parameters
-        script_params = self._read_script_configs(cli_args)
+        script_params, script_config_names = self._read_script_configs(cli_args)
         scriptname = cli_args.script
 
         # Merge script configs with host configs, prioritizing script configs
@@ -150,10 +150,13 @@ class ExpsLauncher():
         # Isolate script parameters only
         script_params = deepcopy(configs)
         del script_params.host
-        self.wandb_sanity_check(script_params)
 
         # Isolate host parameters only
         host_params = self.args_parser.to_dict(configs.host)
+
+        wandb_group_name = self.handle_wandb_group_name(script_params, script_config_names)
+        if wandb_group_name is not None:
+            script_params.group = wandb_group_name
 
         if not exps_params.no_confirmation:
             # Display summary of experiment batch
@@ -238,6 +241,9 @@ class ExpsLauncher():
                 string += f'--{k} '
                 for single_v in v:
                     string += f'{single_v} '
+            elif self.args_parser.is_boolean(v):
+                if v: 
+                    string += f'--{k} '
             else:
                 string += f'--{k}="{v}" '
         return string
@@ -255,13 +261,27 @@ class ExpsLauncher():
             raise ValueError(f'`exps` param should not be controlled in the script parameters. `exps` key is reserved for exps_launcher parameters.')
 
 
-    def wandb_sanity_check(self, script_params):
+    def handle_wandb_group_name(self, script_params, script_config_names):
         """Make sure a wandb group has been defined if wandb online mode is active"""
         if 'wandb' in script_params and script_params['wandb'] == 'online':
             if 'group' not in script_params:
-                print('--- WARNING! A wandb group has not been defined and wandb is running in online mode. ')
-                if not self.ask_confirmation('Do you wish to continue without specifying a group name? (y/n)'):
-                    sys.exit()
+                print(f'--- WARNING! A wandb group has not been defined and wandb is running in online mode. ' \
+                      f'Default group name will be: {self.get_default_wandb_group(script_config_names)}')
+                # if not self.ask_confirmation('Do you wish to continue without specifying a group name? (y/n)'):
+                #     sys.exit()
+                return self.get_default_wandb_group(script_config_names)
+        else:
+            return None
+
+    def get_default_wandb_group(self, script_config_names):
+        """Concatenate all config files names for default
+           wandb group name
+        """
+        string = ''
+        for word in script_config_names:
+            string += word[0].upper()+word[1:]+'_'
+
+        return string[:-1]
 
 
     def _get_test_params(self, cli_args):
@@ -380,17 +400,19 @@ class ExpsLauncher():
         if os.path.isfile(os.path.join(scripts_root, 'default.yaml')):
             default_script_configs = OmegaConf.load(os.path.join(scripts_root, 'default.yaml'))
         
+        config_names = []
         if 'config' in cli_args:
             for conf in cli_args.config:
                 assert os.path.isfile(os.path.join(scripts_root, self.args_parser.add_extension(conf))), f'Desired ' \
                         f'.yaml file does not exist: {os.path.join(scripts_root, self.args_parser.add_extension(conf))}'
                 current =  OmegaConf.load(os.path.join(scripts_root, self.args_parser.add_extension(conf)))
                 script_configs = OmegaConf.merge(script_configs, current)
+                config_names.append(conf)
 
         # Overwrite default values with specific 2nd-level category values
         script_configs = OmegaConf.merge(default_script_configs, script_configs)
 
-        return script_configs
+        return script_configs, config_names
 
     def _read_host_configs(self, hostname):
         host_root = os.path.join(self.root, self.host_configs_root)
