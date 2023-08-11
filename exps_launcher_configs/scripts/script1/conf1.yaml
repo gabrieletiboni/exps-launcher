@@ -1,8 +1,11 @@
 ---
-host.job-name: script1
+host:
+  job-name: scriptspecificjobname
 foo: 1
 bar:
   - 10
   - 20
   - 30
 poo: 40
+sweep:
+  foo: [1, 2, 3]
