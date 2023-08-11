@@ -37,6 +37,7 @@ class ExpsLauncher():
         ### Fixed parameters ######################
         self.host_configs_root = 'hosts'
         self.script_configs_root = 'scripts'
+        self.sweep_configs_root = 'sweeps'
         self.hostname_env_variable = 'EXPS_HOSTNAME'
         ###########################################
         
@@ -306,10 +307,10 @@ class ExpsLauncher():
                 if param == 'config':
                     sweep_conf_files = self.args_parser.as_list(cli_args.sweep[param])
                     for sweep_conf_file in sweep_conf_files:
-                        assert os.path.isfile(os.path.join(self.root, self.sweep_config_root, self.args_parser.add_extension(sweep_conf_file))),\
+                        assert os.path.isfile(os.path.join(self.root, self.sweep_configs_root, self.args_parser.add_extension(sweep_conf_file))),\
                                 f'Desired .yaml file does not exist: '\
-                                f'{os.path.join(self.root, self.sweep_config_root, self.args_parser.add_extension(sweep_conf_file))}'
-                        current =  OmegaConf.load(os.path.join(self.root, self.sweep_config_root, self.args_parser.add_extension(sweep_conf_file)))
+                                f'{os.path.join(self.root, self.sweep_configs_root, self.args_parser.add_extension(sweep_conf_file))}'
+                        current =  OmegaConf.load(os.path.join(self.root, self.sweep_configs_root, self.args_parser.add_extension(sweep_conf_file)))
                         OmegaConf.merge(sweeps_from_config, current)
                 else:
                     sweeps[param] = self.args_parser.as_list(cli_args.sweep[param])
