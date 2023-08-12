@@ -64,6 +64,7 @@ Advanced commands:
   - exps.hostname
   - exps.force_hostname_environ
   - exps.group_suffix
+  - exps.noslurm
 
 
 
