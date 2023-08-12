@@ -88,7 +88,7 @@ class ExpsLauncher():
         exps_params = OmegaConf.merge(default_exps_params, exps_params)
 
         # Hard code default boolean params if they are not in the config.yaml file
-        defaults = {'test': False, 'no_confirmation': False, 'fake': False, 'preview': False, 'force_hostname_environ': True}
+        defaults = {'test': False, 'no_confirmation': False, 'fake': False, 'preview': False, 'force_hostname_environ': True, 'noslurm': False}
         for k, v in defaults.items():
             if k not in exps_params:
                 exps_params[k] = v
@@ -168,7 +168,7 @@ class ExpsLauncher():
             script_params.group = wandb_group_name
 
         # No slurm if testing or if no host parameters have been set
-        with_slurm = False if exps_params.test or len(host_params) == 0 else True
+        with_slurm = False if exps_params.test or len(host_params) == 0 or exps_params.noslurm else True
 
         if not exps_params.no_confirmation:
             # Display summary of experiment batch
