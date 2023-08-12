@@ -5,6 +5,8 @@ import socket
 from copy import deepcopy
 import subprocess
 import sys
+import random
+import string
 
 from sklearn.model_selection import ParameterGrid
 try:
@@ -165,6 +167,9 @@ class ExpsLauncher():
         if wandb_group_name is not None:
             script_params.group = wandb_group_name
 
+        # No slurm if testing or if no host parameters have been set
+        with_slurm = False if exps_params.test or len(host_params) == 0 else True
+
         if not exps_params.no_confirmation:
             # Display summary of experiment batch
             self._display_summary(scriptname=scriptname,
@@ -172,6 +177,7 @@ class ExpsLauncher():
                                   host_params=host_params,
                                   sweep_params=sweep_params,
                                   test=exps_params.test,
+                                  with_slurm=with_slurm,
                                   preview_jobs=exps_params.preview)
 
             if not exps_params.test and not self.ask_confirmation('Do you wish to launch these experiments? (y/n)'):
@@ -185,41 +191,98 @@ class ExpsLauncher():
                           fake=exps_params.fake,
 
                           # Run one local test run without slurm if exps.test=true
-                          with_slurm=True if not exps_params.test else False,
-                          max_runs=None if not exps_params.test else 1
+                          test=exps_params.test,
+                          with_slurm=with_slurm,
                         )
 
-    def _launch_jobs(self, host_params, script_params, sweep_params, default_name, fake=False, max_runs=None, with_slurm=True):
+    def _launch_jobs(self, host_params, script_params, sweep_params, default_name, fake=False, test=False, with_slurm=True):
         """Formats slurm strings and launches all jobs
             
             fake: prints slurm instructions instead of running them
         """
-        with_slurm = True if with_slurm and len(host_params) != 0 else False
+        if with_slurm:
+            self._launch_jobs_with_slurm(host_params, script_params, sweep_params, default_name, fake, max_runs=1 if test else None)
+        else:
+            self._launch_jobs_without_slurm(script_params, sweep_params, default_name, test, fake, max_runs=1 if test else None)
+
+
+    def _launch_jobs_with_slurm(self, host_params, script_params, sweep_params, default_name, fake=False, max_runs=None):
+        """Launch scripts with sbatch command"""
+        for i, sweep_config in enumerate(ParameterGrid(dict(sweep_params))):
+            if max_runs is not None and i >= max_runs:
+                return
+
+            ### command as: sbatch ... --wrap ' python script.py ... '
+            command = f'sbatch '
+            command += self._format_host_params(host_params, default_name=default_name)
+            command += '--wrap \''  # wrap python command
+            command += f'python {default_name}.py '
+            command += self._format_script_params(script_params)
+            command += self._format_sweep_config(sweep_config)
+            command += '\''  # end of --wrap command
+
+            self._execute_foreground(command, fake=fake)
+
+    def _launch_jobs_without_slurm(self, script_params, sweep_params, default_name, test=False, fake=False, max_runs=None):
+        """Launch scripts on local machine directly.
+           Script can be run in foreground (for testing),
+           or multiple sweep scripts can be run in background.
+        """
+        foreground = True if test or fake else False
+
+        if not foreground:
+            group_id = self.get_random_string(5)
+            group_pids = open(f"pids_{group_id}.out", "a")
 
         for i, sweep_config in enumerate(ParameterGrid(dict(sweep_params))):
             if max_runs is not None and i >= max_runs:
                 return
-            command = ''
 
-            if with_slurm:
-                command += f'sbatch '
-                command += self._format_host_params(host_params, default_name=default_name)
-                command += '--wrap \''  # wrap python command
-            command += f'python {default_name}.py '
+            ### command as: python script.py ...
+            curr_id = self.get_random_string(5)
+            log_filename = f'runlog_{curr_id}.out'
+
+            command = f'python {default_name}.py '
             command += self._format_script_params(script_params)
             command += self._format_sweep_config(sweep_config)
-            if with_slurm:
-                command += '\''  # end of --wrap command
 
-            self._execute(command, fake=fake)
+            if foreground:
+                self._execute_foreground(command, fake=fake)
+            else:
+                command += f'> {log_filename} '
+                command += f'2>&1 '
+                command += f'&'
+                pid = self._execute_background(command, fake=False)
+                print(f'Submitted script with PID={pid} (id: {curr_id})')
+                print(pid, file=group_pids)
+
+        if not foreground:
+            print('\n----------------------------------')
+            print(f'kill all spawned processes above by PID: xargs kill < pids_{group_id}.out')
+            print('Alternatively, kill all processes that match command name: pkill -f "script.py"')
+            print('\nClean up commands:')
+            print('rm runlog_*')
+            print('rm pids_*')
+            print('----------------------------------')
 
 
-    def _execute(self, command, fake=False):
+    def _execute_foreground(self, command, fake=False):
         """Execute command on the shell"""        
         if fake:
             print(command)
         else:
             subprocess.run(command, shell=True)
+
+
+    def _execute_background(self, command, stdout=None, stderr=None, fake=False):
+        """Execute command on the shell"""        
+        if fake:
+            print(command)
+            return None
+        else:
+            process = subprocess.Popen(command,
+                                       shell = True)
+            return process.pid
 
 
     def _format_host_params(self, host_params, default_name):
@@ -360,7 +423,7 @@ class ExpsLauncher():
         return sweeps, cli_args, script_params
 
 
-    def _display_summary(self, scriptname, script_params, host_params, sweep_params={}, test=False, preview_jobs=False):
+    def _display_summary(self, scriptname, script_params, host_params, sweep_params={}, test=False, with_slurm=True, preview_jobs=False):
         print(f'{"="*40} SUMMARY {"="*40}')
         print(f'\nScript: {scriptname}.py')
         print('\nSBATCH parameters:', end='')
@@ -385,8 +448,8 @@ class ExpsLauncher():
                               fake=True,  # fake: simply print them
 
                               # Run a local test run without slurm if exps.test=true
-                              with_slurm=True if not test else False,
-                              max_runs=None if not test else 1
+                              test=test,
+                              with_slurm=with_slurm
                             )
         print(f'{"="*89}')
 
@@ -489,3 +552,6 @@ class ExpsLauncher():
             os.makedirs(os.path.join(path))
         except OSError as error:
             pass
+
+    def get_random_string(self, n=5):
+        return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(n))

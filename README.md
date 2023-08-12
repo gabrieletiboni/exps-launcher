@@ -8,6 +8,7 @@ Handle batch job submission on multiple clusters with ease.
     - [ ] additive host.time for config files
     - [X] wandb_group_suffix for default wandb name
     - [X] test run on local machine with exps.test=true
+    - [ ] host.timefactor : multiply time by this factor for a host in particular
 - [ ] non-slurm background scripts submission
 
 ## Installation
