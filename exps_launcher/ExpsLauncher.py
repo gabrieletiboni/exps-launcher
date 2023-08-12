@@ -249,6 +249,12 @@ class ExpsLauncher():
             if foreground:
                 self._execute_foreground(command, fake=fake)
             else:
+                ######
+                print('THE CURRENT VERSION DOES NOT LIMIT THE MAX NUMBER OF CORES REQUESTED. THIS MAY CRASH THE WHOLE SYSTEM')
+                print('FIX THIS BEFORE CONTINUING')
+                sys.exit()
+                ######
+
                 command += f'> {log_filename} '
                 command += f'2>&1 '
                 command += f'&'
