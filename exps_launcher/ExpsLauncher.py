@@ -344,7 +344,7 @@ class ExpsLauncher():
 
     def handle_wandb_group_name(self, script_params, script_config_names, exps_params):
         """Make sure a wandb group has been defined if wandb online mode is active"""
-        if 'wandb' in script_params and script_params['wandb'] == 'online':
+        if 'wandb' in script_params and script_params['wandb'] != 'disabled':
             if 'group' not in script_params:
                 group_name = self.get_default_wandb_group(script_config_names)
                 if 'group_suffix' in exps_params:
