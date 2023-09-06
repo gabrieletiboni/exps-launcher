@@ -170,18 +170,17 @@ class ExpsLauncher():
         # No slurm if testing or if no host parameters have been set
         with_slurm = False if exps_params.test or len(host_params) == 0 or exps_params.noslurm else True
 
-        if not exps_params.no_confirmation:
-            # Display summary of experiment batch
-            self._display_summary(scriptname=scriptname,
-                                  script_params=script_params,
-                                  host_params=host_params,
-                                  sweep_params=sweep_params,
-                                  test=exps_params.test,
-                                  with_slurm=with_slurm,
-                                  preview_jobs=exps_params.preview)
+        # Display summary of experiment batch
+        self._display_summary(scriptname=scriptname,
+                              script_params=script_params,
+                              host_params=host_params,
+                              sweep_params=sweep_params,
+                              test=exps_params.test,
+                              with_slurm=with_slurm,
+                              preview_jobs=exps_params.preview)
 
-            if not exps_params.test and not self.ask_confirmation('Do you wish to launch these experiments? (y/n)'):
-                return False
+        if not exps_params.no_confirmation and not exps_params.test and not self.ask_confirmation('Do you wish to launch these experiments? (y/n)'):
+            return False
 
         self._launch_jobs(
                           host_params=host_params,
@@ -263,8 +262,7 @@ class ExpsLauncher():
                 # print(f'Submitted script with PID={pid} (id: {curr_id})')
                 # print(pid, file=group_pids)
                 #############################
-
-                assert len(dict(sweep_params)) == 1, 'The current version does not limit the max number of cores requested. Therefore, local mode is now limited to a single script in foreground.'
+                assert len(dict(sweep_params)) <= 1, 'The current version does not limit the max number of cores requested. Therefore, local mode is now limited to a single script in foreground.'
                 print('WARNING! Background script execution of non_slurm script is currently not supported. The script is instead run in foreground.')
                 self._execute_foreground(command, fake=fake)
                 
@@ -452,7 +450,7 @@ class ExpsLauncher():
         print(f'\nA total number of {n_exps} jobs is requested.')
 
         if preview_jobs:
-            print(f'\nPreview of slurm instructions that will be launched:')
+            print(f'\nPreview of instructions that will be launched:')
             self._launch_jobs(
                               host_params=host_params,
                               script_params=script_params,
