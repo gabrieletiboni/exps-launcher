@@ -230,9 +230,11 @@ class ExpsLauncher():
         """
         foreground = True if test or fake else False
 
-        if not foreground:
-            group_id = self.get_random_string(5)
-            group_pids = open(f"pids_{group_id}.out", "a")
+        ### TEMP LEFT OUT ###
+        # if not foreground:
+        #     group_id = self.get_random_string(5)
+        #     group_pids = open(f"pids_{group_id}.out", "a")
+        #####################
 
         for i, sweep_config in enumerate(ParameterGrid(dict(sweep_params))):
             if max_runs is not None and i >= max_runs:
@@ -249,18 +251,23 @@ class ExpsLauncher():
             if foreground:
                 self._execute_foreground(command, fake=fake)
             else:
-                ######
-                print('THE CURRENT VERSION DOES NOT LIMIT THE MAX NUMBER OF CORES REQUESTED. THIS MAY CRASH THE WHOLE SYSTEM')
-                print('FIX THIS BEFORE CONTINUING')
-                sys.exit()
-                ######
+                ####### TEMP LEFT OUT #######
+                # print('THE CURRENT VERSION DOES NOT LIMIT THE MAX NUMBER OF CORES REQUESTED. THIS MAY CRASH THE WHOLE SYSTEM')
+                # print('FIX THIS BEFORE CONTINUING')
+                # sys.exit()
 
-                command += f'> {log_filename} '
-                command += f'2>&1 '
-                command += f'&'
-                pid = self._execute_background(command, fake=False)
-                print(f'Submitted script with PID={pid} (id: {curr_id})')
-                print(pid, file=group_pids)
+                # command += f'> {log_filename} '
+                # command += f'2>&1 '
+                # command += f'&'
+                # pid = self._execute_background(command, fake=False)
+                # print(f'Submitted script with PID={pid} (id: {curr_id})')
+                # print(pid, file=group_pids)
+                #############################
+
+                assert len(dict(sweep_params)) == 1, 'The current version does not limit the max number of cores requested. Therefore, local mode is now limited to a single script in foreground.'
+                print('WARNING! Background script execution of non_slurm script is currently not supported. The script is instead run in foreground.')
+                self._execute_foreground(command, fake=fake)
+                
 
         if not foreground:
             print('\n----------------------------------')
