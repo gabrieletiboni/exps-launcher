@@ -95,6 +95,9 @@ class ExpsLauncher():
             else:
                 assert exps_params[k] is not None, f'parameter exps.{k} should be a boolean, not None.'
 
+        if 'cpu_list' not in exps_params:
+            exps_params['cpu_list'] = None
+
         return exps_params
 
     def launch(self):
@@ -109,6 +112,7 @@ class ExpsLauncher():
             exps.preview : bool, prints out all slurm instructions that would be run
             exps.force_hostname_environ : force environment variable to be set
                                           to recognize current hostname
+            exps.cpu_list : ids of cpu cores to be used. (only for local jobs)
         """
         # Read input parameters
         cli_args = self.args_parser.parse_from_cli()
@@ -177,6 +181,7 @@ class ExpsLauncher():
                               sweep_params=sweep_params,
                               test=exps_params.test,
                               with_slurm=with_slurm,
+                              cpu_list=exps_params.cpu_list,
                               preview_jobs=exps_params.preview)
 
         if not exps_params.no_confirmation and not exps_params.test and not self.ask_confirmation('Do you wish to launch these experiments? (y/n)'):
@@ -192,9 +197,11 @@ class ExpsLauncher():
                           # Run one local test run without slurm if exps.test=true
                           test=exps_params.test,
                           with_slurm=with_slurm,
+
+                          cpu_list=exps_params.cpu_list
                         )
 
-    def _launch_jobs(self, host_params, script_params, sweep_params, default_name, fake=False, test=False, with_slurm=True):
+    def _launch_jobs(self, host_params, script_params, sweep_params, default_name, fake=False, test=False, with_slurm=True, cpu_list=None):
         """Formats slurm strings and launches all jobs
             
             fake: prints slurm instructions instead of running them
@@ -202,7 +209,7 @@ class ExpsLauncher():
         if with_slurm:
             self._launch_jobs_with_slurm(host_params, script_params, sweep_params, default_name, fake, max_runs=1 if test else None)
         else:
-            self._launch_jobs_without_slurm(script_params, sweep_params, default_name, test, fake, max_runs=1 if test else None)
+            self._launch_jobs_without_slurm(script_params, sweep_params, default_name, test, fake, max_runs=1 if test else None, cpu_list=cpu_list)
 
 
     def _launch_jobs_with_slurm(self, host_params, script_params, sweep_params, default_name, fake=False, max_runs=None):
@@ -222,7 +229,7 @@ class ExpsLauncher():
 
             self._execute_foreground(command, fake=fake)
 
-    def _launch_jobs_without_slurm(self, script_params, sweep_params, default_name, test=False, fake=False, max_runs=None):
+    def _launch_jobs_without_slurm(self, script_params, sweep_params, default_name, test=False, fake=False, max_runs=None, cpu_list=None):
         """Launch scripts on local machine directly.
            Script can be run in foreground (for testing),
            or multiple sweep scripts can be run in background.
@@ -235,6 +242,7 @@ class ExpsLauncher():
         #     group_pids = open(f"pids_{group_id}.out", "a")
         #####################
 
+        command = ''
         for i, sweep_config in enumerate(ParameterGrid(dict(sweep_params))):
             if max_runs is not None and i >= max_runs:
                 return
@@ -243,7 +251,11 @@ class ExpsLauncher():
             curr_id = self.get_random_string(5)
             log_filename = f'runlog_{curr_id}.out'
 
-            command = f'python {default_name}.py '
+            if cpu_list is not None:
+                assert isinstance(cpu_list, str)
+                command += f'taskset --cpu-list {cpu_list} '
+
+            command += f'python {default_name}.py '
             command += self._format_script_params(script_params)
             command += self._format_sweep_config(sweep_config)
 
@@ -434,7 +446,7 @@ class ExpsLauncher():
         return sweeps, cli_args, script_params
 
 
-    def _display_summary(self, scriptname, script_params, host_params, sweep_params={}, test=False, with_slurm=True, preview_jobs=False):
+    def _display_summary(self, scriptname, script_params, host_params, sweep_params={}, test=False, with_slurm=True, cpu_list=None, preview_jobs=False):
         print(f'{"="*40} SUMMARY {"="*40}')
         print(f'\nScript: {scriptname}.py')
         print('\nSBATCH parameters:', end='')
@@ -460,7 +472,8 @@ class ExpsLauncher():
 
                               # Run a local test run without slurm if exps.test=true
                               test=test,
-                              with_slurm=with_slurm
+                              with_slurm=with_slurm,
+                              cpu_list=cpu_list
                             )
         print(f'{"="*89}')
 
