@@ -250,10 +250,11 @@ class ExpsLauncher():
         assert 'now' in script_params, 'Unexpected Error: why is now not in the script parameters?'
         assert n_of_configs * script_params.now < multiprocessing.cpu_count() - 1, 'Make sure no more than the available CPU cores are used'
 
-        command = ''
         for i, sweep_config in enumerate(ParameterGrid(dict(sweep_params))):
             if max_runs is not None and i >= max_runs:
                 return
+            
+            command = ''
 
             ### command as: python script.py ...
             curr_id = self.get_random_string(5)
