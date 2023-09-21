@@ -7,6 +7,9 @@ import subprocess
 import sys
 import random
 import string
+# import shlex
+import itertools
+import multiprocessing
 
 from sklearn.model_selection import ParameterGrid
 try:
@@ -236,11 +239,16 @@ class ExpsLauncher():
         """
         foreground = True if test or fake else False
 
-        ### TEMP LEFT OUT ###
+        ### PIDs returned are currently wrong
         # if not foreground:
         #     group_id = self.get_random_string(5)
         #     group_pids = open(f"pids_{group_id}.out", "a")
-        #####################
+
+        # Sanity check on the number of CPU cores requested vs. the available ones
+        list_of_sweeps = [c_list for c_param, c_list in sweep_params.items()]
+        n_of_configs = len(list(itertools.product(*list_of_sweeps)))
+        assert 'now' in script_params, 'Unexpected Error: why is now not in the script parameters?'
+        assert n_of_configs * script_params.now < multiprocessing.cpu_count() - 1, 'Make sure no more than the available CPU cores are used'
 
         command = ''
         for i, sweep_config in enumerate(ParameterGrid(dict(sweep_params))):
@@ -253,6 +261,7 @@ class ExpsLauncher():
 
             if cpu_list is not None:
                 assert isinstance(cpu_list, str)
+                assert n_of_configs == 1, 'the use of cpu_list should be limited to single scripts. Why are you using it for multiple scripts in parallel?'
                 command += f'taskset --cpu-list {cpu_list} '
 
             command += f'python {default_name}.py '
@@ -267,22 +276,23 @@ class ExpsLauncher():
                 # print('FIX THIS BEFORE CONTINUING')
                 # sys.exit()
 
-                # command += f'> {log_filename} '
-                # command += f'2>&1 '
-                # command += f'&'
-                # pid = self._execute_background(command, fake=False)
+                command += f'> {log_filename} '
+                command += f'2>&1 '
+                command += f'&'
+                pid = self._execute_background(command, fake=False, outfilename=log_filename)
+                print(f'Submitted script with id: {curr_id} (log at: runlog_{curr_id}.out)')
                 # print(f'Submitted script with PID={pid} (id: {curr_id})')
                 # print(pid, file=group_pids)
                 #############################
-                assert len(dict(sweep_params)) <= 1, 'The current version does not limit the max number of cores requested. Therefore, local mode is now limited to a single script in foreground.'
-                print('WARNING! Background script execution of non_slurm script is currently not supported. The script is instead run in foreground.')
-                self._execute_foreground(command, fake=fake)
+                # assert len(dict(sweep_params)) <= 1, 'The current version does not limit the max number of cores requested. Therefore, local mode is now limited to a single script in foreground.'
+                # print('WARNING! Background script execution of non_slurm script is currently not supported. The script is instead run in foreground.')
+                # self._execute_foreground(command, fake=fake)
                 
 
         if not foreground:
             print('\n----------------------------------')
-            print(f'kill all spawned processes above by PID: xargs kill < pids_{group_id}.out')
-            print('Alternatively, kill all processes that match command name: pkill -f "script.py"')
+            # print(f'kill all spawned processes above by PID: xargs kill < pids_{group_id}.out (DOES NOT WORK AS OF RIGHT NOW BECAUSE PIDs RETURNED ARE NO CORRECT.)')
+            print(f'Alternatively, kill all processes that match command name: pkill -f "{default_name}.py"')
             print('\nClean up commands:')
             print('rm runlog_*')
             print('rm pids_*')
@@ -297,14 +307,20 @@ class ExpsLauncher():
             subprocess.run(command, shell=True)
 
 
-    def _execute_background(self, command, stdout=None, stderr=None, fake=False):
+    def _execute_background(self, command, stdout=None, stderr=None, fake=False, outfilename=''):
         """Execute command on the shell"""        
         if fake:
             print(command)
             return None
         else:
-            process = subprocess.Popen(command,
-                                       shell = True)
+            ### This below still does not work because
+            # exec_command = shlex.split(command)
+            # log = open(outfilename, 'a')
+            # process = subprocess.Popen(exec_command, stdout=log, stderr=log)
+
+            ### This works but the pids are wrong (because shell=True)
+            process = subprocess.Popen(command, shell=True)
+
             return process.pid
 
 
