@@ -237,7 +237,7 @@ class ExpsLauncher():
            Script can be run in foreground (for testing),
            or multiple sweep scripts can be run in background.
         """
-        foreground = True if test or fake else False
+        foreground = True if test else False
 
         ### PIDs returned are currently wrong
         # if not foreground:
@@ -280,8 +280,10 @@ class ExpsLauncher():
                 command += f'> {log_filename} '
                 command += f'2>&1 '
                 command += f'&'
-                pid = self._execute_background(command, fake=False, outfilename=log_filename)
-                print(f'Submitted script with id: {curr_id} (log at: runlog_{curr_id}.out)')
+                pid = self._execute_background(command, fake=fake, outfilename=log_filename)
+                
+                if not fake:
+                    print(f'Submitted script with id: {curr_id} (log at: runlog_{curr_id}.out)')
                 # print(f'Submitted script with PID={pid} (id: {curr_id})')
                 # print(pid, file=group_pids)
                 #############################
