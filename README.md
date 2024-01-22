@@ -3,6 +3,8 @@ Handle batch job submission on multiple clusters with ease.
 
 ### Features tracking
 
+- [X] Automatic wandb group naming from config .yaml files
+- [X] Automatic sweep over hyperparameters (`sweep.foo=[1,2,3] sweep.bar=["alice","bob"]`)
 - [X] Slurm jobs submission
     - [ ] common config files for different scripts
     - [ ] additive host.time for config files
@@ -10,7 +12,8 @@ Handle batch job submission on multiple clusters with ease.
     - [X] test run on local machine with exps.test=true
     - [ ] host.timefactor : multiply time by this factor for a host in particular
     - [ ] ignore host retrieval when exps.test=true (since it does not matter)
-- [ ] non-slurm background scripts submission
+- [X] non-slurm background scripts submission on local machine
+- [X] handle cpu cores constraints for local non-slurm scripts
 
 ## Installation
 ```
@@ -21,14 +24,14 @@ pip install .
 ```
 
 ## Getting Started
-Include the configuration files in your current project directory, following the project structure below.
-Then, copy and launch the `launch_exps.py` with its command line parameters to launch experiments.
+Create the `exps_launcher_configs` directory inside your project directory, following the structure below.
+Then, copy the `launch_exps.py` file inside your project directory.
 
 0. `export EXPS_HOSTNAME=<customhostname>`
 1. Project structure:
 ```
 .
-└── exps_root/
+└── exps_launcher_configs/
     ├── config.yaml              # exps_launcher configs (can be overwritten by cli args exps.<params>)
     ├── host/                    # host-specific sbatch parameters (--partition, --project, ...)
     │   ├── default.yaml         # default params for all hosts
@@ -54,19 +57,21 @@ Notes:
 - the `script` parameter is mandatory, and must be a single string. A single script can be invoked.
 - multiple configurations for the same script can be provided with the `config` parameter. Priority is in decreasing order, i.e. conf2 overwrites conf1 in the example above.
 - sweep parameters like `sweep.foo=[1,10,100]` can also be defined in script-specific conf files.
-- host parameters like `host.time="03:00:00"` can also be defined in script-specific conf files, which overwrite the host definitions. This way you can specify different sbatch times for different scripts and their corresponding configurations, or different sbatch names.
+- host parameters like `host.time="03:00:00"` can also be defined in script-specific conf files, which overwrite the host definitions. This way you can specify different sbatch times for different scripts and their corresponding configurations, or different sbatch names (`host.job-name="foo")`.
 - you can pass `exps.hostname` to overwrite the hostname for the current experiment, e.g. to have different host configurations for the same host
 
 Advanced commands:
 - Use exps.<param_name>=<value> for config options. Accepted params are:
-  - exps.test
-  - exps.no_confirmation
-  - exps.fake
+  - exps.test=false
+  - exps.no_confirmation=false
+  - exps.fake=false
   - exps.hostname
-  - exps.force_hostname_environ
-  - exps.group_suffix
-  - exps.noslurm
-  - exps.cpulist
+  - exps.force_hostname_environ=true
+  - exps.group_suffix=""  # assumes script has a --group parameter for the wandb group name
+  - exps.noslurm=false
+  - CPU usage:
+    - (noslurm, single script) exps.cpus-list="50,51,52"
+    - (noslurm, multiple scripts) exps.cpus-start=50 exps.cpus-per-task=4
 
 
 ## Troubleshooting

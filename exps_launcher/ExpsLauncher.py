@@ -98,8 +98,11 @@ class ExpsLauncher():
             else:
                 assert exps_params[k] is not None, f'parameter exps.{k} should be a boolean, not None.'
 
-        if 'cpu_list' not in exps_params:
-            exps_params['cpu_list'] = None
+        # Handle non-boolean defaults (does not check for them to be different than None)
+        defaults = {'cpus-list': None, 'cpus-start': None, 'cpus-per-task': None}
+        for k, v in defaults.items():
+            if k not in exps_params:
+                exps_params[k] = v
 
         return exps_params
 
@@ -115,7 +118,7 @@ class ExpsLauncher():
             exps.preview : bool, prints out all slurm instructions that would be run
             exps.force_hostname_environ : force environment variable to be set
                                           to recognize current hostname
-            exps.cpu_list : ids of cpu cores to be used. (only for local jobs)
+            exps.cpus-list : ids of cpu cores to be used. (only for local jobs)
         """
         # Read input parameters
         cli_args = self.args_parser.parse_from_cli()
@@ -182,10 +185,10 @@ class ExpsLauncher():
                               script_params=script_params,
                               host_params=host_params,
                               sweep_params=sweep_params,
-                              test=exps_params.test,
                               with_slurm=with_slurm,
-                              cpu_list=exps_params.cpu_list,
-                              preview_jobs=exps_params.preview)
+                              test=exps_params.test,
+                              exps_params=exps_params
+                              )
 
         if not exps_params.no_confirmation and not exps_params.test and not self.ask_confirmation('Do you wish to launch these experiments? (y/n)'):
             return False
@@ -201,18 +204,30 @@ class ExpsLauncher():
                           test=exps_params.test,
                           with_slurm=with_slurm,
 
-                          cpu_list=exps_params.cpu_list
+                          exps_params=exps_params
                         )
 
-    def _launch_jobs(self, host_params, script_params, sweep_params, default_name, fake=False, test=False, with_slurm=True, cpu_list=None):
+    def _launch_jobs(self, host_params, script_params, sweep_params, default_name, fake=False, test=False, with_slurm=True, exps_params={}):
         """Formats slurm strings and launches all jobs
             
             fake: prints slurm instructions instead of running them
         """
         if with_slurm:
-            self._launch_jobs_with_slurm(host_params, script_params, sweep_params, default_name, fake, max_runs=1 if test else None)
+            self._launch_jobs_with_slurm(host_params,
+                                         script_params,
+                                         sweep_params,
+                                         default_name,
+                                         fake,
+                                         max_runs=1 if test else None)
         else:
-            self._launch_jobs_without_slurm(script_params, sweep_params, default_name, test, fake, max_runs=1 if test else None, cpu_list=cpu_list)
+            self._launch_jobs_without_slurm(script_params,
+                                            sweep_params,
+                                            default_name,
+                                            test,
+                                            fake,
+                                            max_runs=1 if test else None,
+                                            exps_params=exps_params
+                                            )
 
 
     def _launch_jobs_with_slurm(self, host_params, script_params, sweep_params, default_name, fake=False, max_runs=None):
@@ -232,7 +247,7 @@ class ExpsLauncher():
 
             self._execute_foreground(command, fake=fake)
 
-    def _launch_jobs_without_slurm(self, script_params, sweep_params, default_name, test=False, fake=False, max_runs=None, cpu_list=None):
+    def _launch_jobs_without_slurm(self, script_params, sweep_params, default_name, test=False, fake=False, max_runs=None, exps_params={}):
         """Launch scripts on local machine directly.
            Script can be run in foreground (for testing),
            or multiple sweep scripts can be run in background.
@@ -244,11 +259,21 @@ class ExpsLauncher():
         #     group_id = self.get_random_string(5)
         #     group_pids = open(f"pids_{group_id}.out", "a")
 
+        cpus_list, cpus_start, cpus_per_task  = exps_params['cpus-list'], exps_params['cpus-start'], exps_params['cpus-per-task']
+
+
         # Sanity check on the number of CPU cores requested vs. the available ones
         list_of_sweeps = [c_list for c_param, c_list in sweep_params.items()]
         n_of_configs = len(list(itertools.product(*list_of_sweeps)))
-        assert 'now' in script_params, 'Unexpected Error: why is now not in the script parameters?'
+        assert 'now' in script_params, 'Unexpected Error: why is --now not among the script parameters? --now parameter is expected when launching local scripts to tell how many parallel CPU workers the script will be using.'
         assert n_of_configs * script_params.now < multiprocessing.cpu_count() - 1, 'Make sure no more than the available CPU cores are used'
+
+        # Sanity checks
+        if cpus_list is not None:
+            assert isinstance(cpus_list, str), 'exps.cpus-list should be provided as string, e.g. exps.cpus-list="50,51,52,53,54"'
+            assert n_of_configs == 1, 'exps.cpus-list is limited to single scripts. Use `cpus-start` and `cpus-per-task` instead for launching parallel scripts with constrained cpu usage.'
+
+        assert (cpus_start is None and cpus_per_task is None) or (cpus_start is not None and cpus_per_task is not None), 'Neither or both parameters exps.cpus-start and exps.cpus-per-task shall be defined.'
 
         for i, sweep_config in enumerate(ParameterGrid(dict(sweep_params))):
             if max_runs is not None and i >= max_runs:
@@ -260,10 +285,10 @@ class ExpsLauncher():
             curr_id = self.get_random_string(5)
             log_filename = f'runlog_{curr_id}.out'
 
-            if cpu_list is not None:
-                assert isinstance(cpu_list, str)
-                assert n_of_configs == 1, 'the use of cpu_list should be limited to single scripts. Why are you using it for multiple scripts in parallel?'
-                command += f'taskset --cpu-list {cpu_list} '
+            if cpus_list is not None:
+                command += f'taskset --cpu-list {cpus_list} '
+            elif cpus_per_task is not None:
+                command += f'taskset --cpu-list {self.from_list_to_string(list(range(cpus_start + i*cpus_per_task, cpus_start + (i+1)*cpus_per_task)))} '
 
             command += f'python {default_name}.py '
             command += self._format_script_params(script_params)
@@ -292,7 +317,7 @@ class ExpsLauncher():
                 # self._execute_foreground(command, fake=fake)
                 
 
-        if not foreground:
+        if not foreground and not fake:
             print('\n----------------------------------')
             # print(f'kill all spawned processes above by PID: xargs kill < pids_{group_id}.out (DOES NOT WORK AS OF RIGHT NOW BECAUSE PIDs RETURNED ARE NO CORRECT.)')
             print(f'Alternatively, kill all processes that match command name: pkill -f "{default_name}.py"')
@@ -465,7 +490,7 @@ class ExpsLauncher():
         return sweeps, cli_args, script_params
 
 
-    def _display_summary(self, scriptname, script_params, host_params, sweep_params={}, test=False, with_slurm=True, cpu_list=None, preview_jobs=False):
+    def _display_summary(self, scriptname, script_params, host_params, sweep_params={}, with_slurm=True, test=False, exps_params={}):
         print(f'{"="*40} SUMMARY {"="*40}')
         print(f'\nScript: {scriptname}.py')
         print('\nSBATCH parameters:', end='')
@@ -477,10 +502,18 @@ class ExpsLauncher():
         print('\nSWEEP parameters:', end='')
         print(self.args_parser.pformat_dict(sweep_params, indent=1))
 
+        print('\nWARNINGs:')
+        warnings = self.get_warnings_list(script_params=script_params, host_params=host_params, sweep_params=sweep_params, exps_params=exps_params)
+        if warnings is None:
+            print('  No warnings found.')
+        else:
+            for warning in warnings:
+                print(f'  {warning}')
+
         n_exps = self._get_n_exps(sweep_params)
         print(f'\nA total number of {n_exps} jobs is requested.')
 
-        if preview_jobs:
+        if exps_params['preview']:
             print(f'\nPreview of instructions that will be launched:')
             self._launch_jobs(
                               host_params=host_params,
@@ -490,17 +523,33 @@ class ExpsLauncher():
                               fake=True,  # fake: simply print them
 
                               # Run a local test run without slurm if exps.test=true
-                              test=test,
                               with_slurm=with_slurm,
-                              cpu_list=cpu_list
+                              test=test,
+                              
+                              exps_params=exps_params
                             )
         print(f'{"="*89}')
+
+
+    def get_warnings_list(self, script_params, host_params, sweep_params, exps_params):
+        """Check for warnings to be displayed"""
+        warnings = []
+        if exps_params.noslurm:
+            assert 'now' in script_params, 'Unexpected Error: why is --now not among the script parameters? --now parameter is expected when launching local scripts to tell how many parallel CPU workers the script will be using.' 
+            cpus_list, cpus_start, cpus_per_task  = exps_params['cpus-list'], exps_params['cpus-start'], exps_params['cpus-per-task']
+            if cpus_per_task is not None:
+                if cpus_per_task != script_params.now:
+                    warnings.append(f'cpus-per-task ({cpus_per_task}) is different than --now parameter ({script_params.now}). Are you sure?')
+
+        return None if len(warnings) == 0 else warnings
+
 
     def _get_n_exps(self, sweep_params):
         n_exps = 1
         for k, v in sweep_params.items():
             n_exps *= len(v)
         return n_exps
+
 
     def _read_script_configs(self, cli_args):
         assert isinstance(cli_args.script, str)
@@ -536,6 +585,7 @@ class ExpsLauncher():
 
         return script_configs, config_names
 
+
     def _read_host_configs(self, hostname):
         host_root = os.path.join(self.root, self.host_configs_root)
 
@@ -554,12 +604,14 @@ class ExpsLauncher():
 
         return host_configs
 
+
     def _check_mandatory_params(self, args):
         if 'script' not in args:
             print(f'`script` parameter must be passed, specifying the corresponding config folder.')
             return False
 
         return True
+
 
     def _check_all_sbatch_params(self, host_params):
         mandatory_params = ['mem-per-cpu', 'time', 'job-name', 'ntasks']
@@ -596,5 +648,13 @@ class ExpsLauncher():
         except OSError as error:
             pass
 
+
     def get_random_string(self, n=5):
         return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(n))
+
+    def from_list_to_string(self, seq):
+        """Map list `seq` into string of items
+            separated by a comma
+        """
+        seq_string = [str(item) for item in seq]
+        return ",".join(seq_string)
