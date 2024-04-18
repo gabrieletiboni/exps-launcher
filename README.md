@@ -63,16 +63,21 @@ Notes:
 
 Advanced commands:
 - Use exps.<param_name>=<value> for config options. Accepted params are:
-  - exps.test=false
-  - exps.no_confirmation=false [skip asking for confirmation before actually launching the experiments]
-  - exps.fake=false
-  - exps.hostname
-  - exps.force_hostname_environ=true
-  - exps.group_suffix=""  # assumes script has a --group parameter for the wandb group name
-  - exps.noslurm=false
-  - CPU usage:
-    - (noslurm, single script) exps.cpus-list="50,51,52"
-    - (noslurm, multiple scripts) exps.cpus-start=50 exps.cpus-per-task=4
+  - `exps.test=false`  [launch script in test mode, using test.yaml config]
+  - `exps.no_confirmation=false`  [skip asking for confirmation before actually launching the experiments]
+  - `exps.fake=false`  [display summary but do not actually launch the experiments]
+  - `exps.hostname`  [overwrite hostname defined in env variable EXPS_HOSTNAME]
+  - `exps.force_hostname_environ=true`  [force using env variable to define the hostname]
+  - `exps.group_suffix="_mySuffix"`  [assumes script has a --group parameter for the wandb group name]
+  - `exps.noslurm=false`  [launch script locally, instead of as a slurm job]
+  - CPU usage constraints:
+    - (noslurm, single script) `exps.cpus-list="50,51,52"`
+    - (noslurm, multiple scripts) `exps.cpus-start=50 exps.cpus-per-task=4`
+sdsd
+
+## Examples
+List of repositories that make use of this experiments launcher that you can use as further reference:
+- [Doraemon](https://github.com/gabrieletiboni/doraemon)
 
 
 ## Troubleshooting
