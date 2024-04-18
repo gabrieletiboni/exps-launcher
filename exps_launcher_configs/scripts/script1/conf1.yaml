@@ -1,6 +1,4 @@
 ---
-host:
-  job-name: scriptspecificjobname
 foo: 1
 bar:
   - 10

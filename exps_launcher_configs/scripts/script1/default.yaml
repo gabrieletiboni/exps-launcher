@@ -1,1 +1,3 @@
 ---
+host:
+  job-name: scriptspecificjobname
