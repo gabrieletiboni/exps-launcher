@@ -73,7 +73,6 @@ Advanced commands:
   - CPU usage constraints:
     - (noslurm, single script) `exps.cpus-list="50,51,52"`
     - (noslurm, multiple scripts) `exps.cpus-start=50 exps.cpus-per-task=4`
-sdsd
 
 ## Examples
 List of repositories that make use of this experiments launcher that you can use as further reference:
