@@ -62,7 +62,7 @@ Notes:
 - you can pass `exps.hostname` to overwrite the hostname for the current experiment, e.g. to have different host configurations for the same host
 
 Advanced commands:
-- Use exps.<param_name>=<value> for config options. Accepted params are:
+- Use `exps.<param_name>=<value>` for config options. Accepted params are:
   - `exps.test=false`  [launch script in test mode, using test.yaml config]
   - `exps.no_confirmation=false`  [skip asking for confirmation before actually launching the experiments]
   - `exps.fake=false`  [display summary but do not actually launch the experiments]
